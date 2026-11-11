@@ -131,6 +131,24 @@ class TestBackend(unittest.TestCase):
 
 @unittest.skipUnless(os.name == "posix", "Requires Linux installer support")
 class InstallTests(unittest.TestCase):
+    def test_matching_catch_all_401_requires_explicit_confirmation(self):
+        import install
+
+        endpoint = "https://maps.example.org/status"
+        with patch.object(install, "public_request", return_value=(401, None, b"Unauthorized")) as request:
+            with patch.object(install, "ask", return_value="yes"):
+                install.check_existing_path(endpoint, INSTANCE)
+            self.assertTrue(request.call_args.args[0].startswith("https://maps.example.org/garmin-status-probe-"))
+            with patch.object(install, "ask", return_value="no"), self.assertRaises(ValueError):
+                install.check_existing_path(endpoint, INSTANCE)
+        with (
+            patch.object(install, "public_request", side_effect=[(401, None, b"Protected"), (404, None, b"Missing")]),
+            patch.object(install, "ask") as prompt,
+            self.assertRaises(ValueError),
+        ):
+            install.check_existing_path(endpoint, INSTANCE)
+        prompt.assert_not_called()
+
     def test_compose_caddy_is_detected_and_selected_by_default(self):
         import install
 

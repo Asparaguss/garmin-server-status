@@ -243,6 +243,22 @@ def has_valid_tls(domain):
         return False
 
 
+def check_existing_path(endpoint, instance):
+    code, marker, body = public_request(endpoint)
+    if code == 404 or marker == instance:
+        return
+    if code == 401 and marker is None:
+        parent = endpoint.rstrip("/").rsplit("/", 1)[0]
+        trailing_slash = "/" if endpoint.endswith("/") else ""
+        probe = f"{parent}/garmin-status-probe-{secrets.token_hex(12)}{trailing_slash}"
+        if public_request(probe) == (401, None, body):
+            print(f"{endpoint} returned the same HTTP 401 as a random path. "
+                  "The proxy may require authentication for unknown paths.")
+            if ask("Use this exact path for Garmin Server Status? (yes/no)", "no").lower() == "yes":
+                return
+    raise ValueError(f"{endpoint} already returns HTTP {code}. Choose an unused exact path.")
+
+
 def verify(url, instance, token):
     deadline = time.monotonic() + 120
     last = "waiting for HTTPS"
@@ -312,9 +328,7 @@ def install():
     endpoint = f"https://{domain}{path}"
     trusted = has_valid_tls(domain)
     if trusted:
-        code, marker, _ = public_request(endpoint)
-        if code != 404 and marker != instance:
-            raise ValueError(f"{endpoint} already returns HTTP {code}. Choose an unused exact path.")
+        check_existing_path(endpoint, instance)
         print(f"Reusing the existing trusted TLS endpoint for {domain}.")
     else:
         print(f"No trusted HTTPS certificate served for {domain}. Caddy must complete ACME issuance.")
