@@ -62,6 +62,49 @@ def ask(label, default=""):
     return input(label + suffix + ": ").strip() or default
 
 
+def active_native_caddy():
+    if not shutil.which("caddy"):
+        return False
+    try:
+        run("systemctl", "is-active", "caddy.service")
+    except (OSError, RuntimeError, subprocess.SubprocessError):
+        return False
+    return True
+
+
+def running_caddy_containers():
+    if not shutil.which("docker"):
+        return []
+    try:
+        listing = run("docker", "ps", "--format", "{{json .}}")
+    except (OSError, RuntimeError, subprocess.SubprocessError):
+        return []
+    names = set()
+    for line in listing.splitlines():
+        entry = json.loads(line)
+        labels = entry.get("Labels", "").split(",")
+        image = entry.get("Image", "").rsplit("/", 1)[-1].split("@", 1)[0].split(":", 1)[0]
+        if image == "caddy" or "com.docker.compose.service=caddy" in labels:
+            names.add(entry["Names"])
+    return sorted(names)
+
+
+def choose_proxy(prior):
+    candidates = running_caddy_containers()
+    if candidates:
+        print("Running Docker Caddy containers: " + ", ".join(candidates))
+    default_mode = prior.get("mode") or ("docker" if candidates and not active_native_caddy() else "native")
+    mode = ask("Caddy setup (native or docker)", default_mode).lower()
+    if mode not in {"native", "docker"}:
+        raise ValueError("Choose native or docker")
+    container = ""
+    if mode == "docker":
+        default_container = prior.get("container") or (candidates[0] if len(candidates) == 1 else "")
+        container = ask("Running Caddy container", default_container)
+    config = ask("Active Caddyfile path", prior.get("source", "/etc/caddy/Caddyfile"))
+    return mode, container, config
+
+
 def write(path, content, mode=0o644):
     staged = path.with_name("." + path.name + "." + secrets.token_hex(6))
     fd = os.open(staged, os.O_WRONLY | os.O_CREAT | os.O_EXCL, mode)
@@ -82,7 +125,8 @@ class Proxy:
         self.environment = dict(os.environ)
         if mode == "native":
             if not shutil.which("caddy"):
-                raise ValueError("Install the Caddy systemd package first, then run this installer again")
+                raise ValueError("No native Caddy executable found. For Caddy in Docker Compose, rerun and choose "
+                                 "docker. For native Caddy, install and start its systemd package first.")
             self.config = Path(config or "/etc/caddy/Caddyfile").resolve(strict=True)
             self.source = str(self.config)
             self.cwd = self.config.parent
@@ -252,11 +296,7 @@ def install():
     prior = json.loads(prior_path.read_text()) if prior_path.exists() else {}
     domain, path = address(ask("Public hostname", prior.get("domain", "")),
                            ask("Status URL path", "/status"))
-    mode = ask("Caddy setup (native or docker)", prior.get("mode", "native"))
-    if mode not in {"native", "docker"}:
-        raise ValueError("Choose native or docker")
-    container = ask("Running Caddy container", prior.get("container", "caddy")) if mode == "docker" else ""
-    config = ask("Active Caddyfile path", prior.get("source", "/etc/caddy/Caddyfile"))
+    mode, container, config = choose_proxy(prior)
     proxy = Proxy(mode, container, config)
     if prior and (mode, container, str(proxy.config), proxy.listener) != (
             prior["mode"], prior["container"], prior["config"], prior["listener"]):

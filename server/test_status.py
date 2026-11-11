@@ -131,6 +131,34 @@ class TestBackend(unittest.TestCase):
 
 @unittest.skipUnless(os.name == "posix", "Requires Linux installer support")
 class InstallTests(unittest.TestCase):
+    def test_compose_caddy_is_detected_and_selected_by_default(self):
+        import install
+
+        listing = "\n".join(json.dumps(record) for record in (
+            {"Names": "maps-caddy-1", "Image": "local/proxy:stable",
+             "Labels": "com.docker.compose.project=maps,com.docker.compose.service=caddy"},
+            {"Names": "maps-api-1", "Image": "local/maps:stable",
+             "Labels": "com.docker.compose.service=api"},
+        ))
+        with (
+            patch.object(install.shutil, "which", side_effect=lambda name: "/usr/bin/docker" if name == "docker" else None),
+            patch.object(install, "run", return_value=listing),
+            patch.object(install, "ask", side_effect=lambda _, default="": default),
+        ):
+            self.assertEqual(("docker", "maps-caddy-1", "/etc/caddy/Caddyfile"),
+                             install.choose_proxy({}))
+
+    def test_multiple_docker_caddy_containers_require_a_selection(self):
+        import install
+
+        with (
+            patch.object(install, "running_caddy_containers", return_value=["maps-caddy-1", "proxy"]),
+            patch.object(install, "active_native_caddy", return_value=False),
+            patch.object(install, "ask", side_effect=["docker", "proxy", "/etc/caddy/Caddyfile"]) as prompts,
+        ):
+            self.assertEqual(("docker", "proxy", "/etc/caddy/Caddyfile"), install.choose_proxy({}))
+            self.assertEqual(("Running Caddy container", ""), prompts.call_args_list[1].args)
+
     def test_docker_file_bind_and_persistent_data_mount(self):
         from install import Proxy
 
