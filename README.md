@@ -6,13 +6,17 @@ The dashboard shows aggregate CPU utilization, RAM used, root filesystem used, u
 
 ## Linux setup
 
-Extract the installer archive on the Linux host, or clone this repository there. The shell launcher checks systemd 247+, Python 3.10+, and the HTTPS trust store. On hosts with APT or DNF it offers to install missing Python or CA certificates from the configured package repositories. On other distributions, install those dependencies using your package manager. [Installer releases](https://github.com/Asparaguss/garmin-server-status/releases)
-
-Use a running Caddy proxy configured by a Caddyfile. On a fresh host, install and start the Caddy systemd package first. For Docker, use an existing running Caddy container on a local Linux Docker engine with the Caddyfile mounted from the host and a persistent volume or directory mounted at `/data`.
+Download `setup.sh` to the Linux host and run it from the directory where you want to keep the installer. It uses `curl` to download a specific release and verifies its pinned SHA-256 before extracting it. The script asks before running the installer with administrator privileges. [Download setup.sh](https://github.com/Asparaguss/garmin-server-status/releases/latest/download/setup.sh)
 
 ```sh
-sudo sh install.sh
+sh setup.sh
 ```
+
+To inspect the package first, run `sh setup.sh --download-only`. You can also download and extract the installer archive manually or clone this repository. From the extracted or cloned directory, run `sudo sh install.sh`. [Installer releases](https://github.com/Asparaguss/garmin-server-status/releases)
+
+The installer checks systemd 247+, Python 3.10+, and the HTTPS trust store. On hosts with APT or DNF it offers to install missing Python or CA certificates from the configured package repositories. On other distributions, install those dependencies using your package manager.
+
+Use a running Caddy proxy configured by a Caddyfile. On a fresh host, install and start the Caddy systemd package first. For Docker, use an existing running Caddy container on a local Linux Docker engine with the Caddyfile mounted from the host and a persistent volume or directory mounted at `/data`.
 
 Enter your public hostname, such as `status.example.org`, and an unused exact URL path. Press Enter to use `/status`. Choose native or Docker Caddy and give the path to the active Caddyfile. For Docker, use the path inside the container, commonly `/etc/caddy/Caddyfile`. The installer mounts no additional Docker volumes. Native Caddy connects over host loopback. Docker Caddy connects through a Unix socket in the existing `/data` mount. The metrics process runs on the host as a systemd dynamic user in both cases.
 
