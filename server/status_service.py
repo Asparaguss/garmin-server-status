@@ -12,6 +12,7 @@ from threading import Event, Thread
 
 PROC = Path("/proc")
 SAMPLE_INTERVAL = 2
+SSH_SNAPSHOT = Path("/run/garmin-server-status-ssh/count.json")
 
 
 def cpu_counters(proc):
@@ -44,6 +45,17 @@ def read_metrics(proc, disk, previous, current):
     }
 
 
+def read_ssh_count(path=SSH_SNAPSHOT):
+    try:
+        snapshot = json.loads(path.read_text(encoding="ascii"))
+        count, sampled_at = snapshot["count"], snapshot["sampled_at"]
+        if type(count) is int and count >= 0 and 0 <= time.time() - sampled_at <= 180:
+            return count
+    except (OSError, ValueError, TypeError, KeyError):
+        pass
+    return None
+
+
 class Sampler:
     def __init__(self, proc=PROC, disk="/"):
         self.proc = proc
@@ -67,7 +79,9 @@ class Sampler:
 
     def reading(self):
         sample = self.sample
-        return sample[1] if sample and time.monotonic() - sample[0] <= 10 else None
+        if not sample or time.monotonic() - sample[0] > 10:
+            return None
+        return dict(sample[1], ssh_failed_24h=read_ssh_count())
 
 
 class StatusHandler(BaseHTTPRequestHandler):

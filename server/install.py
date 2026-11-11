@@ -25,6 +25,7 @@ APP = Path("/opt/garmin-server-status")
 STATE = Path("/etc/garmin-server-status")
 SYSTEMD = Path("/etc/systemd/system")
 UNIT = "garmin-server-status"
+SSH_UNIT = UNIT + "-ssh"
 MARKER_HEADER = "X-Garmin-Status"
 SERVICE = """[Unit]
 Description=Garmin Server Status metrics
@@ -45,6 +46,35 @@ ProtectControlGroups=yes
 RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
 RestrictSUIDSGID=yes
 UMask=0077
+"""
+SSH_SERVICE = """[Unit]
+Description=Count unsuccessful SSH connections for Garmin Server Status
+
+[Service]
+Type=oneshot
+ExecStart={python} /opt/garmin-server-status/ssh_activity.py
+RuntimeDirectory=garmin-server-status-ssh
+RuntimeDirectoryMode=0755
+RuntimeDirectoryPreserve=yes
+NoNewPrivileges=yes
+PrivateNetwork=yes
+PrivateDevices=yes
+ProtectSystem=strict
+ProtectHome=yes
+UMask=0077
+TimeoutStartSec=45
+MemoryMax=96M
+"""
+SSH_TIMER = """[Unit]
+Description=Refresh the Garmin Server Status SSH count
+
+[Timer]
+OnActiveSec=1s
+OnUnitInactiveSec=1min
+AccuracySec=5s
+
+[Install]
+WantedBy=timers.target
 """
 
 
@@ -286,9 +316,12 @@ def install_service(listener):
     if not re.fullmatch(r"/[a-zA-Z0-9_./-]+", interpreter):
         raise ValueError("Use a system Python interpreter with an absolute path without spaces")
     APP.mkdir(mode=0o755, parents=True, exist_ok=True)
-    source = Path(__file__).with_name("status_service.py")
-    write(APP / source.name, source.read_text(encoding="utf-8"))
+    for filename in ("status_service.py", "ssh_activity.py"):
+        source = Path(__file__).with_name(filename)
+        write(APP / filename, source.read_text(encoding="utf-8"))
     write(SYSTEMD / f"{UNIT}.service", SERVICE.format(python=interpreter))
+    write(SYSTEMD / f"{SSH_UNIT}.service", SSH_SERVICE.format(python=interpreter))
+    write(SYSTEMD / f"{SSH_UNIT}.timer", SSH_TIMER)
     socket_unit = (
         "[Unit]\nDescription=Private Garmin Server Status listener\n\n"
         f"[Socket]\nListenStream={listener}\nSocketMode=0666\nRemoveOnStop=yes\n\n"
@@ -296,6 +329,7 @@ def install_service(listener):
     )
     write(SYSTEMD / f"{UNIT}.socket", socket_unit)
     run("systemctl", "daemon-reload")
+    run("systemctl", "start", f"{SSH_UNIT}.timer")
     run("systemctl", "start", f"{UNIT}.socket")
     run("systemctl", "try-restart", f"{UNIT}.service")
 
@@ -356,6 +390,7 @@ def install():
         print(f"Verifying HTTPS at {endpoint}…", flush=True)
         verify(endpoint, instance, token)
         run("systemctl", "enable", f"{UNIT}.socket")
+        run("systemctl", "enable", f"{SSH_UNIT}.timer")
         record = dict(domain=domain, path=path, mode=mode, container=container, source=proxy.source,
                       config=str(proxy.config), listener=proxy.listener)
         write(prior_path, json.dumps(record, indent=2) + "\n", 0o600)
@@ -372,6 +407,7 @@ def install():
             try:
                 run("systemctl", "disable", "--now", f"{UNIT}.socket")
                 run("systemctl", "stop", f"{UNIT}.service")
+                run("systemctl", "disable", "--now", f"{SSH_UNIT}.timer")
             except (RuntimeError, subprocess.SubprocessError):
                 print(f"Check {UNIT}.socket and {UNIT}.service with systemctl.", file=sys.stderr)
         raise

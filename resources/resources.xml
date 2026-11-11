@@ -2,6 +2,7 @@
     <string id="AppName">Server Status</string>
     <string id="EndpointTitle">HTTPS endpoint</string>
     <string id="TokenTitle">Read-only status token</string>
+    <string id="ServerNameTitle">Server name</string>
     <string id="RefreshTitle">Refresh interval</string>
     <string id="RefreshManual">Manual only</string>
     <string id="Refresh30">30 seconds</string>
@@ -12,6 +13,7 @@
     <properties>
         <property id="endpoint" type="string"></property>
         <property id="token" type="string"></property>
+        <property id="serverName" type="string"></property>
         <property id="refreshSeconds" type="number">60</property>
     </properties>
     <settings>
@@ -20,6 +22,9 @@
         </setting>
         <setting propertyKey="@Properties.token" title="@Strings.TokenTitle">
             <settingConfig type="alphaNumeric" maxLength="128"/>
+        </setting>
+        <setting propertyKey="@Properties.serverName" title="@Strings.ServerNameTitle">
+            <settingConfig type="alphaNumeric" maxLength="24"/>
         </setting>
         <setting propertyKey="@Properties.refreshSeconds" title="@Strings.RefreshTitle">
             <settingConfig type="list">

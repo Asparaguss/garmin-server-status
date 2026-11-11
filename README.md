@@ -2,7 +2,9 @@
 
 Server Status is a standalone Connect IQ watch app and a small Linux metrics service. The watch requests a reading over HTTPS through Garmin Connect on the paired phone. The dashboard refreshes when opened, every minute while visible by default, and when you press GPS/START. The glance shows the cached CPU and RAM values with the reading age. Selecting it opens the dashboard and requests a fresh reading.
 
-The dashboard shows aggregate CPU utilization, RAM used, root filesystem used, uptime, and reading age. On Instinct 2, Instinct 3 Solar, and Instinct E, the round inset displays CPU. The service reads `/proc` and `statvfs` directly, with a two-second sampling interval.
+The dashboard shows CPU utilization, RAM and root disk usage, uptime, reading age, and unsuccessful SSH connections logged in the last 24 hours. On Instinct 2, Instinct 3 Solar, and Instinct E, the round inset displays CPU. The service reads `/proc` and `statvfs` directly, with a two-second sampling interval.
+
+The SSH count is refreshed about once a minute from the retained system journal for OpenSSH services. It includes rejected keys or certificates, failed SSH negotiation, and logged disconnects before authentication, with multiple messages grouped by connection. OpenSSH cannot tell why a client disconnected. The dashboard displays `--` until a fresh count is available. Rerun `sudo sh install.sh` from the updated installer to add the collector to an existing installation.
 
 ## Linux setup
 
@@ -39,6 +41,8 @@ For troubleshooting, use `journalctl -u caddy` or `docker logs <caddy-container>
 
 Set **HTTPS endpoint** to the full URL printed by the installer and **Read-only status token** to the value from `show-token`. Choose **Refresh interval** from manual only, 30 seconds, 1 minute, 2 minutes, or 5 minutes. Manual only still fetches on opening and on GPS/START. For Store-installed builds, use the app's settings in Connect IQ. Keep Garmin Connect paired and connected on the phone.
 
+Set **Server name** to label the dashboard and glance. The field accepts up to 24 characters. The watch shortens names that exceed the space on its display.
+
 For a USB sideload, copy the model-specific `.prg` from `build/` to `GARMIN/APPS`. Garmin's mobile settings UI relies on Store metadata. To configure a sideload, use the Garmin SDK app settings editor with the matching build, enter the URL and token, and copy its generated `.SET` file to `GARMIN/APPS/SETTINGS` with the same basename and case as the `.prg`. Treat the `.SET` file as a credential. [Garmin developer discussion on sideload settings](https://forums.garmin.com/developer/connect-iq/f/discussion/429848/solved-settings-connect-iq-app-for-sideloaded-app---is-this-possible/2005107)
 
 SDK build targets include Instinct 2, 2S, 2X, Crossover, Crossover AMOLED, Instinct 3 Solar 45/50 mm, Instinct 3 AMOLED 45 mm and 50 mm, and Instinct E 40 mm and 45 mm. Garmin uses `instinct3solar45mm` for both Solar sizes. Device-app glances require Connect IQ 4.0 or later. The Instinct 2 family and original Crossover run the dashboard from the app launcher. [Garmin device reference](https://developer.garmin.com/connect-iq/device-reference/) · [Garmin entry points](https://developer.garmin.com/connect-iq/articles/user-experience-guidelines/Entry_Points.html)
@@ -55,6 +59,12 @@ monkeyc -f monkey.jungle -d instinct3solar45mm -y developer_key.der -o build/Ser
 ```
 
 `preview.jungle` uses the same dashboard and glance with sample readings. Use it for simulator captures. `monkey.jungle` uses the HTTPS client and settings.
+
+Build the package for the separate Connect IQ Store listing with `release.jungle`. Its manifest has its own app ID.
+
+```sh
+monkeyc -e -r -f release.jungle -y developer_key.der -o build/ServerStatus-release.iq
+```
 
 ```sh
 python3 server/test_status.py -v

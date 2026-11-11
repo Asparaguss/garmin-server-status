@@ -2,8 +2,8 @@
 set -eu
 
 # Update both values when publishing a new installer archive.
-release=v0.1.4
-archive_sha256=43df7adc03a2c714c42af9c232a2998bd35e0436c6bfad42eb275d2ea717c2ca
+release=v0.1.5
+archive_sha256=cfbd323030cdb13a2d43ffb08f6cafeb6f5401bd7713947594f56cda80397289
 asset=garmin-server-status-linux.tar.gz
 release_page="https://github.com/Asparaguss/garmin-server-status/releases/tag/$release"
 archive_url="https://github.com/Asparaguss/garmin-server-status/releases/download/$release/$asset"

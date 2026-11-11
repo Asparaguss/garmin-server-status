@@ -14,6 +14,8 @@ from unittest.mock import patch
 
 from caddy_config import ACME, address, plan
 from status_service import ActivatedServer, Sampler, cpu_counters, read_metrics
+from ssh_activity import count_connections
+from status_service import read_ssh_count
 
 TOKEN = "a" * 64
 INSTANCE = "test-instance"
@@ -73,6 +75,33 @@ def request(connection, path="/metrics", token=None, method="GET"):
 
 
 class TestBackend(unittest.TestCase):
+    def test_ssh_count_collapses_failed_connections_and_excludes_successes(self):
+        def event(pid, message, source="sshd-session"):
+            return {"_BOOT_ID": "boot", "_PID": str(pid), "MESSAGE": message, "SYSLOG_IDENTIFIER": source}
+
+        entries = [
+            event(1, "Failed publickey for root from 192.0.2.1 port 1234 ssh2"),
+            event(1, "Connection closed by authenticating user root 192.0.2.1 port 1234 [preauth]"),
+            event(2, 'error: Refusing certificate ID "example": Certificate invalid: expired'),
+            event(2, "Connection closed by authenticating user deploy 192.0.2.2 port 1234 [preauth]"),
+            event(3, "Unable to negotiate with 2001:db8::1 port 1234: no matching host key type found [preauth]"),
+            event(4, "Connection reset by 192.0.2.4 port 1234 [preauth]"),
+            event(5, "Failed publickey for root from 192.0.2.5 port 1234 ssh2"),
+            event(6, "Accepted publickey for root from 192.0.2.5 port 1234 ssh2", "sshd-auth"),
+            event(7, "Disconnected from user root 192.0.2.7 port 1234"),
+            event(8, "Invalid user test from 192.0.2.8 port 1234", "other"),
+        ]
+        self.assertEqual(4, count_connections(entries))
+
+    def test_ssh_count_unavailable_when_snapshot_is_missing_or_old(self):
+        with tempfile.TemporaryDirectory() as temp:
+            snapshot = Path(temp) / "count.json"
+            self.assertIsNone(read_ssh_count(snapshot))
+            snapshot.write_text(json.dumps({"count": 0, "sampled_at": int(time.time())}))
+            self.assertEqual(0, read_ssh_count(snapshot))
+            snapshot.write_text(json.dumps({"count": 12, "sampled_at": int(time.time()) - 200}))
+            self.assertIsNone(read_ssh_count(snapshot))
+
     def test_linux_counters(self):
         if not hasattr(os, "statvfs"):
             self.skipTest("Requires Linux /proc and statvfs")

@@ -23,7 +23,7 @@ case "$0" in
     *) directory=. ;;
 esac
 directory=$(CDPATH= cd -P "$directory" && pwd)
-for file in install.py caddy_config.py status_service.py; do
+for file in install.py caddy_config.py status_service.py ssh_activity.py; do
     [ -r "$directory/server/$file" ] || fail 'Extract the complete Server Status archive before running install.sh.'
 done
 
@@ -37,6 +37,7 @@ if [ "$action" != show-token ]; then
         fail 'Server Status requires systemd 247 or later for service credentials.'
 fi
 if [ "$action" = install ]; then
+    [ -x /usr/bin/journalctl ] || fail 'The SSH counter requires journalctl at /usr/bin/journalctl.'
     for file in stat meminfo loadavg uptime; do
         [ -r "/proc/$file" ] || fail "Could not read /proc/$file. Run the installer on the Linux host."
     done

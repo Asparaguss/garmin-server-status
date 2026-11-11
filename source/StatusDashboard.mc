@@ -43,6 +43,7 @@ class StatusDashboard extends WatchUi.View {
     function settingsChanged() {
         if (_visible) {
             scheduleRefresh();
+            WatchUi.requestUpdate();
         }
         if (!StatusSource.current(_connection)) {
             _connection = StatusSource.connection();
@@ -96,8 +97,8 @@ class StatusDashboard extends WatchUi.View {
             _message = "Check status token";
         } else if (code == 200) {
             _message = "Invalid reading";
-        } else if (code < 0) {
-            _message = "Connection failed";
+        } else if (code <= 0) {
+            _message = "Net error " + code.format("%d");
         } else {
             _message = "HTTP " + code.format("%d");
         }
@@ -127,7 +128,8 @@ class StatusDashboard extends WatchUi.View {
         var rightTop = cpuDial ? inset.x - 16 : width - 22;
         var left = 19;
         var right = width - 22;
-        dc.drawText(26, 8, font, cpuDial ? "SERVER" : "Server Status", Graphics.TEXT_JUSTIFY_LEFT);
+        var title = ServerLabel.name(cpuDial ? "SERVER" : "Server Status");
+        dc.drawText(26, 8, font, ServerLabel.fit(dc, font, title, rightTop - 26), Graphics.TEXT_JUSTIFY_LEFT);
 
         if (_reading != null) {
             var dividerY = height * 42 / 100;
@@ -143,7 +145,8 @@ class StatusDashboard extends WatchUi.View {
             }
             dc.drawLine(left, dividerY, right, dividerY);
             row(dc, left, right, dividerY + 9, font, "Uptime", StatusReading.duration(_reading["uptime_s"]));
-            row(dc, left, right, dividerY + 32, font, "Age", StatusReading.age(_reading));
+            row(dc, left, right, dividerY + 28, font, "SSH fail 24h", sshCount());
+            row(dc, left, right, dividerY + 47, font, "Age", StatusReading.age(_reading));
         } else {
             dc.drawText(width / 2, height / 2 - 8, font, "No reading yet", Graphics.TEXT_JUSTIFY_CENTER);
         }
@@ -170,7 +173,9 @@ class StatusDashboard extends WatchUi.View {
         var font = Graphics.FONT_TINY;
         var muted = 0xAAAAAA;
         var accent = 0x78E5C6;
-        dc.drawText(w / 2, h * 12 / 100, Graphics.FONT_SMALL, "Server Status", Graphics.TEXT_JUSTIFY_CENTER);
+        var titleFont = Graphics.FONT_SMALL;
+        var title = ServerLabel.fit(dc, titleFont, ServerLabel.name("Server Status"), w * 62 / 100);
+        dc.drawText(w / 2, h * 12 / 100, titleFont, title, Graphics.TEXT_JUSTIFY_CENTER);
         if (_reading != null) {
             meter(dc, w, h * 25 / 100, font, "CPU", "cpu", accent);
             meter(dc, w, h * 36 / 100, font, "RAM", "ram", accent);
@@ -179,10 +184,11 @@ class StatusDashboard extends WatchUi.View {
             dc.setColor(0x343C3C, Graphics.COLOR_TRANSPARENT);
             dc.drawLine(w * 20 / 100, h * 58 / 100, w * 80 / 100, h * 58 / 100);
             dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
-            row(dc, w * 21 / 100, w * 79 / 100, h * 64 / 100, font, "Uptime",
+            row(dc, w * 21 / 100, w * 79 / 100, h * 62 / 100, font, "Uptime",
                 StatusReading.duration(_reading["uptime_s"]));
+            row(dc, w * 21 / 100, w * 79 / 100, h * 70 / 100, small, "SSH failures (24h)", sshCount());
             dc.setColor(muted, Graphics.COLOR_TRANSPARENT);
-            row(dc, w * 21 / 100, w * 79 / 100, h * 74 / 100, small, "Reading age", StatusReading.age(_reading));
+            row(dc, w * 24 / 100, w * 76 / 100, h * 78 / 100, small, "Reading age", StatusReading.age(_reading));
         } else {
             dc.drawText(w / 2, h / 2 - 12, font, "No reading yet", Graphics.TEXT_JUSTIFY_CENTER);
         }
@@ -215,6 +221,11 @@ class StatusDashboard extends WatchUi.View {
 
     private function percent(key) {
         return _reading[key].format("%d") + "%";
+    }
+
+    private function sshCount() {
+        var count = _reading["ssh_failed_24h"];
+        return count instanceof Number && count >= 0 ? count.format("%d") : "--";
     }
 }
 
