@@ -1,0 +1,9 @@
+/build/
+/*.tar.gz
+/*.sha256
+__pycache__/
+*.der
+*.pem
+*.set
+*.SET
+.env

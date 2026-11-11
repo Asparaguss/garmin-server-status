@@ -1,0 +1,34 @@
+<resources>
+    <string id="AppName">Server Status</string>
+    <string id="EndpointTitle">HTTPS endpoint</string>
+    <string id="TokenTitle">Read-only status token</string>
+    <string id="RefreshTitle">Refresh interval</string>
+    <string id="RefreshManual">Manual only</string>
+    <string id="Refresh30">30 seconds</string>
+    <string id="Refresh60">1 minute</string>
+    <string id="Refresh120">2 minutes</string>
+    <string id="Refresh300">5 minutes</string>
+    <bitmap id="LauncherIcon" filename="launcher.svg"/>
+    <properties>
+        <property id="endpoint" type="string"></property>
+        <property id="token" type="string"></property>
+        <property id="refreshSeconds" type="number">60</property>
+    </properties>
+    <settings>
+        <setting propertyKey="@Properties.endpoint" title="@Strings.EndpointTitle">
+            <settingConfig type="url"/>
+        </setting>
+        <setting propertyKey="@Properties.token" title="@Strings.TokenTitle">
+            <settingConfig type="alphaNumeric" maxLength="128"/>
+        </setting>
+        <setting propertyKey="@Properties.refreshSeconds" title="@Strings.RefreshTitle">
+            <settingConfig type="list">
+                <listEntry value="0">@Strings.RefreshManual</listEntry>
+                <listEntry value="30">@Strings.Refresh30</listEntry>
+                <listEntry value="60">@Strings.Refresh60</listEntry>
+                <listEntry value="120">@Strings.Refresh120</listEntry>
+                <listEntry value="300">@Strings.Refresh300</listEntry>
+            </settingConfig>
+        </setting>
+    </settings>
+</resources>
