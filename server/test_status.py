@@ -1,4 +1,5 @@
 import http.client
+import io
 import json
 import os
 from pathlib import Path
@@ -131,6 +132,38 @@ class TestBackend(unittest.TestCase):
 
 @unittest.skipUnless(os.name == "posix", "Requires Linux installer support")
 class InstallTests(unittest.TestCase):
+    def test_show_token_displays_endpoint_and_passes_only_token_to_qr_encoder(self):
+        import install
+
+        stdout, stderr = io.StringIO(), io.StringIO()
+        with (
+            patch.object(install.sys, "stdout", stdout),
+            patch.object(install.sys, "stderr", stderr),
+            patch.object(stdout, "isatty", return_value=True),
+            patch.object(stderr, "isatty", return_value=True),
+            patch.object(install.shutil, "which", return_value="/usr/bin/qrencode"),
+            patch.object(install.subprocess, "run") as encoder,
+        ):
+            install.show_token(TOKEN, {"domain": "maps.example.org", "path": "/status"})
+        self.assertEqual(TOKEN + "\n", stdout.getvalue())
+        self.assertIn("https://maps.example.org/status", stderr.getvalue())
+        self.assertEqual(TOKEN.encode("ascii"), encoder.call_args.kwargs["input"])
+        self.assertNotIn(TOKEN, encoder.call_args.args[0])
+
+    def test_redirected_show_token_outputs_only_the_token(self):
+        import install
+
+        stdout, stderr = io.StringIO(), io.StringIO()
+        with (
+            patch.object(install.sys, "stdout", stdout),
+            patch.object(install.sys, "stderr", stderr),
+            patch.object(install.subprocess, "run") as encoder,
+        ):
+            install.show_token(TOKEN, {"domain": "maps.example.org", "path": "/status"})
+        encoder.assert_not_called()
+        self.assertEqual(TOKEN + "\n", stdout.getvalue())
+        self.assertEqual("", stderr.getvalue())
+
     def test_matching_catch_all_401_requires_explicit_confirmation(self):
         import install
 

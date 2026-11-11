@@ -29,6 +29,8 @@ sudo sh install.sh show-token
 sudo sh install.sh rotate-token
 ```
 
+In an interactive terminal, `show-token` displays your full HTTPS endpoint, including the path such as `/status`, and the token. Install `qrencode` through your system package manager to also display a QR code. The QR code contains the full token as plain text. Scan it on your phone and paste the result into **Read-only status token** in Connect IQ. Redirected output contains only the token.
+
 Rotation replaces the current bearer token. Update the watch settings with the new value. The token authorizes only the read-only status response.
 
 For troubleshooting, use `journalctl -u caddy` or `docker logs <caddy-container>` for TLS and routing, and `journalctl -u garmin-server-status.service` for metrics collection. The public endpoint should return HTTP 401 without the token.

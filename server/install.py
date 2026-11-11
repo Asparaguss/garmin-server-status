@@ -383,6 +383,27 @@ def install():
     print(f"Rotate token: {command} rotate-token")
 
 
+def show_token(token, installation):
+    interactive = sys.stdout.isatty() and sys.stderr.isatty()
+    if interactive:
+        print(f"HTTPS endpoint: https://{installation['domain']}{installation['path']}", file=sys.stderr)
+        print("Read-only status token:", file=sys.stderr, flush=True)
+    print(token, flush=True)
+    if not interactive:
+        return
+    encoder = shutil.which("qrencode")
+    if encoder is None:
+        print("Install qrencode with your package manager to display a scannable token.", file=sys.stderr)
+        return
+    print("Scan the QR code and copy the token into Connect IQ settings.", file=sys.stderr, flush=True)
+    try:
+        subprocess.run([encoder, "-t", "ANSIUTF8", "-m", "4", "-o", "-"],
+                       input=token.encode("ascii"), stdout=sys.stderr, stderr=subprocess.DEVNULL,
+                       check=True, timeout=5)
+    except (OSError, subprocess.SubprocessError):
+        print("Could not render the QR code. Copy the token shown above.", file=sys.stderr)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("action", nargs="?", default="install", choices=["install", "show-token", "rotate-token"])
@@ -395,11 +416,12 @@ def main():
         if options.action == "install":
             install()
             return
-        if not (STATE / "install.json").is_file():
+        installation = STATE / "install.json"
+        if not installation.is_file():
             raise ValueError("Install and verify Server Status before managing the token")
         token_file = STATE / "token"
         if options.action == "show-token":
-            print(token_file.read_text().strip())
+            show_token(token_file.read_text().strip(), json.loads(installation.read_text(encoding="utf-8")))
             return
         old_token = token_file.read_text()
         token = secrets.token_hex(32)
